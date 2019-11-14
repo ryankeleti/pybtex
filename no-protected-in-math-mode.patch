@@ -1,0 +1,50 @@
+From 0eb95e327cb5ec8553f17d4bf18d8b021b383ee3 Mon Sep 17 00:00:00 2001
+From: Pieter Belmans <pieterbelmans@gmail.com>
+Date: Tue, 26 Dec 2017 11:27:41 +0100
+Subject: [PATCH] Fixes #110
+
+No protected in math mode: a very naive solution, which is sufficient
+for my use case.
+---
+ pybtex/markup/__init__.py | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/pybtex/markup/__init__.py b/pybtex/markup/__init__.py
+index a54250e..0c06227 100644
+--- a/pybtex/markup/__init__.py
++++ b/pybtex/markup/__init__.py
+@@ -28,6 +28,7 @@ from pybtex.richtext import String, Text, Protected
+ class LaTeXParser(Scanner):
+     LBRACE = Literal(u'{')
+     RBRACE = Literal(u'}')
++    MATH = Literal(u'$')
+
+     def parse(self, level=0):
+         """
+@@ -49,8 +50,11 @@ class LaTeXParser(Scanner):
+         return Text(*self.iter_string_parts(level=level))
+
+     def iter_string_parts(self, level=0):
++        in_math_mode = False
++
+         while True:
+-            token = self.skip_to([self.LBRACE, self.RBRACE])
++            token = self.skip_to([self.LBRACE, self.RBRACE, self.MATH])
++
+             if not token:
+                 remainder = self.get_remainder()
+                 if remainder:
+@@ -58,6 +62,11 @@ class LaTeXParser(Scanner):
+                 if level != 0:
+                     raise PybtexSyntaxError('unbalanced braces', self)
+                 break
++            elif token.pattern is self.MATH: # we ignore things like \$ for now
++                in_math_mode = not in_math_mode
++                yield String(token.value)
++            elif in_math_mode and token.pattern in [self.LBRACE, self.RBRACE]:
++                yield String(token.value)
+             elif token.pattern is self.LBRACE:
+                 yield String(token.value[:-1])
+                 yield Protected(*self.iter_string_parts(level=level + 1))
+--
+2.9.3 (Apple Git-75)+GitX
